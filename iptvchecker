@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPTV Kanal Testi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        h1 {
+            margin-top: 20px;
+        }
+        input[type="text"],
+        button {
+            width: 80%;
+            padding: 10px;
+            margin: 10px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        table {
+            width: 80%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .working {
+            color: green;
+        }
+        .non-working {
+            color: red;
+        }
+        #downloadLink {
+            display: none;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>IPTV Kanal Testi</h1>
+    <input type="text" id="m3uURL" placeholder="M3U bağlantısını buraya yazın">
+    <button onclick="testChannels()">Kanalları Test Et</button>
+
+    <table id="channelTable">
+        <thead>
+            <tr>
+                <th>Kanal Adı</th>
+                <th>Durum</th>
+                <th>Bağlantı</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <a id="downloadLink">Çalışan Kanalları İndir</a>
+
+    <script>
+        var workingChannels = []; // Çalışan kanalların listesi
+
+        function testChannels() {
+            var m3uURL = document.getElementById("m3uURL").value;
+            fetch(m3uURL)
+            .then(response => response.text())
+            .then(data => parseM3U(data))
+            .catch(error => console.error('M3U dosyası alınırken bir hata oluştu:', error));
+        }
+
+        function parseM3U(m3uData) {
+            var lines = m3uData.split('\n');
+            var channels = [];
+            for (var i = 0; i < lines.length; i++) {
+                if (lines[i].startsWith("#EXTINF")) {
+                    var parts = lines[i].split(',');
+                    if (parts.length > 1) {
+                        var channelName = parts[1];
+                        var channelURL = lines[i + 1];
+                        channels.push({ name: channelName, url: channelURL });
+                    }
+                }
+            }
+            var promises = channels.map(channel => testLink(channel.url, channel.name));
+            Promise.all(promises).then(() => updateDownloadLink());
+        }
+
+        function testLink(link, channelName) {
+            return new Promise(resolve => {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', link, true);
+                xhr.timeout = 10000; // On saniye zaman aşımı
+                xhr.onload = function() {
+                    addChannelRow(channelName, link, xhr.status === 200 ? 'Çalışıyor' : 'Çalışmıyor');
+                    resolve();
+                };
+                xhr.ontimeout = xhr.onerror = function() {
+                    addChannelRow(channelName, link, 'Çalışmıyor');
+                    resolve();
+                };
+                xhr.send();
+            });
+        }
+
+        function addChannelRow(channelName, link, status) {
+            var tableRow = document.createElement("tr");
+            var nameCell = document.createElement("td");
+            nameCell.textContent = channelName;
+            var statusCell = document.createElement("td");
+            statusCell.textContent = status;
+            statusCell.className = status === 'Çalışıyor' ? 'working' : 'non-working';
+            var linkCell = document.createElement("td");
+            var linkElement = document.createElement("a");
+            linkElement.textContent = "Bağlantı";
+            linkElement.href = link;
+            linkElement.target = "_blank";
+            linkCell.appendChild(linkElement);
+            tableRow.appendChild(nameCell);
+            tableRow.appendChild(statusCell);
+            tableRow.appendChild
+(linkCell);
+            document.getElementById("channelTable").getElementsByTagName("tbody")[0].appendChild(tableRow);
+            if (status === 'Çalışıyor') {
+                workingChannels.push({ name: channelName, link: link });
+            }
+        }
+
+        function updateDownloadLink() {
+            var downloadData = workingChannels.map(channel => channel.name + ": " + channel.link).join("\n");
+            var blob = new Blob([downloadData], { type: 'text/plain' });
+            var url = URL.createObjectURL(blob);
+            var downloadLink = document.getElementById('downloadLink');
+            downloadLink.href = url;
+            downloadLink.download = 'calisan_kanallar.txt';
+            downloadLink.style.display = 'block';
+            if (workingChannels.length === 0) {
+                alert("Hiçbir kanal çalışmıyor.");
+            }
+        }
+    </script>
+</body>
+</html>
+
